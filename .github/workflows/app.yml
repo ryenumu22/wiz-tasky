@@ -1,0 +1,36 @@
+name: app-build-scan-deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  AWS_REGION: us-east-2
+  ECR_REPO: tasky
+  CLUSTER: wiz-eks
+  IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+  build-scan-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write          # used in Part 4 (OIDC login to AWS)
+      security-events: write   # used in Part 3 (upload scan results)
+    outputs:
+      image: ${{ steps.push.outputs.image }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build image
+        run: docker build -t $ECR_REPO:$IMAGE_TAG .
+
+      - name: Verify ROHHH.txt is in the image
+        run: docker run --rm --entrypoint cat $ECR_REPO:$IMAGE_TAG /app/ROHHH.txt
