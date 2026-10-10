@@ -84,3 +84,35 @@ jobs:
           docker tag $ECR_REPO:$IMAGE_TAG $IMAGE
           docker push $IMAGE
           echo "image=$IMAGE" >> $GITHUB_OUTPUT
+
+  deploy:
+    needs: build-scan-push
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Connect kubectl to EKS
+        run: aws eks update-kubeconfig --name $CLUSTER --region $AWS_REGION
+
+      - name: Deploy new image
+        run: |
+          sed -i "s|image: .*tasky:.*|image: ${{ needs.build-scan-push.outputs.image }}|" k8s/tasky.yaml
+          grep "image:" k8s/tasky.yaml
+          kubectl apply -f k8s/tasky.yaml
+          kubectl -n tasky rollout status deployment/tasky --timeout=300s
+
+      - name: Verify ROHHH.txt in the running container
+        run: kubectl -n tasky exec deploy/tasky -- cat /app/ROHHH.txt
+
+      - name: Show deployment
+        run: kubectl -n tasky get deploy,pods,svc,ingress -o wide
