@@ -34,3 +34,8 @@ jobs:
 
       - name: Verify ROHHH.txt is in the image
         run: docker run --rm --entrypoint cat $ECR_REPO:$IMAGE_TAG /app/ROHHH.txt
+
+      - name: Secret scan (Gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
